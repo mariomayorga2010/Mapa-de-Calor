@@ -1,0 +1,650 @@
+<!DOCTYPE html>
+<html lang="es" data-theme="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BPMN: Desarrollo de Aplicaciones y Pase a Producción</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        /* --- VARIABLES DE TEMA CLARO (Por defecto) --- */
+        :root {
+            --bg-page: #f8fafc;
+            --text-main: #334155;
+            --text-muted: #64748b;
+            --pool-header: #e2e8f0;
+            --lane-header: #f1f5f9;
+            --cell-bg: #ffffff;
+            --border-color: #cbd5e1;
+            
+            --task-bg: #eff6ff;
+            --task-border: #3b82f6;
+            --task-text: #1e40af;
+            
+            --gateway-bg: #fefce8;
+            --gateway-border: #eab308;
+            --gateway-text: #854d0e;
+            
+            --event-start-bg: #f0fdf4;
+            --event-start-border: #22c55e;
+            --event-start-text: #166534;
+            
+            --event-end-bg: #fef2f2;
+            --event-end-border: #ef4444;
+            --event-end-text: #991b1b;
+            
+            --artifact-bg: transparent;
+            --artifact-border: #94a3b8;
+
+            --modal-overlay: rgba(15, 23, 42, 0.6);
+        }
+
+        /* --- VARIABLES DE TEMA OSCURO --- */
+        [data-theme="dark"] {
+            --bg-page: #121212;
+            --text-main: #e0e0e0;
+            --text-muted: #9e9e9e;
+            --pool-header: #1f1f2e;
+            --lane-header: #29293d;
+            --cell-bg: #1e1e1e;
+            --border-color: #333333;
+            
+            --task-bg: #1e3a8a;
+            --task-border: #3b82f6;
+            --task-text: #ffffff;
+            
+            --gateway-bg: #b45309;
+            --gateway-border: #f59e0b;
+            --gateway-text: #ffffff;
+            
+            --event-start-bg: #064e3b;
+            --event-start-border: #10b981;
+            --event-start-text: #ffffff;
+            
+            --event-end-bg: #7f1d1d;
+            --event-end-border: #ef4444;
+            --event-end-text: #ffffff;
+            
+            --artifact-bg: transparent;
+            --artifact-border: #a1a1aa;
+
+            --modal-overlay: rgba(0, 0, 0, 0.8);
+        }
+
+        body {
+            font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, Roboto, Helvetica, Arial, sans-serif;
+            background-color: var(--bg-page);
+            color: var(--text-main);
+            margin: 0;
+            padding: 30px 20px;
+            box-sizing: border-box;
+            line-height: 1.5;
+            transition: background-color 0.3s, color 0.3s;
+        }
+
+        h1 {
+            text-align: center;
+            font-weight: 300;
+            letter-spacing: 1.5px;
+            margin-bottom: 5px;
+        }
+
+        p.subtitle {
+            text-align: center;
+            color: var(--text-muted);
+            margin-bottom: 20px;
+            font-size: 1.1rem;
+        }
+
+        /* --- BOTÓN FLOTANTE (DARK/LIGHT MODE) --- */
+        .theme-btn {
+            position: fixed;
+            bottom: 30px;
+            right: 30px;
+            width: 60px;
+            height: 60px;
+            border-radius: 50%;
+            background-color: var(--task-border);
+            color: white;
+            border: none;
+            cursor: pointer;
+            font-size: 1.8rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 999;
+            transition: transform 0.2s, filter 0.2s, background-color 0.3s;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+        }
+
+        .theme-btn:hover {
+            transform: scale(1.1);
+            filter: brightness(1.1);
+        }
+
+        /* Leyenda */
+        .controls-container {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+
+        .legend {
+            font-size: 0.85rem;
+            color: var(--text-muted);
+            display: flex;
+            justify-content: center;
+            gap: 20px;
+            background-color: var(--cell-bg);
+            padding: 10px 20px;
+            border-radius: 20px;
+            display: inline-flex;
+            border: 1px solid var(--border-color);
+            box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+        }
+        .legend i { margin-right: 5px; }
+
+        /* --- CONTENEDOR DEL DIAGRAMA --- */
+        .bpmn-pool {
+            display: grid;
+            grid-template-columns: 150px repeat(6, minmax(220px, 1fr));
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            overflow-x: auto;
+            background-color: var(--border-color);
+            gap: 1px;
+            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.05);
+        }
+
+        .header-cell {
+            background-color: var(--pool-header);
+            padding: 15px;
+            text-align: center;
+            font-weight: 600;
+            color: var(--text-main);
+            position: sticky;
+            top: 0;
+            z-index: 3;
+        }
+
+        .pool-title {
+            background-color: var(--pool-header);
+            grid-row: span 6;
+            writing-mode: vertical-rl;
+            transform: rotate(180deg);
+            text-align: center;
+            font-size: 1.1rem;
+            letter-spacing: 3px;
+            padding: 20px;
+            color: var(--text-main);
+            font-weight: bold;
+        }
+
+        .lane-title {
+            background-color: var(--lane-header);
+            padding: 15px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            font-weight: 600;
+            font-size: 0.9rem;
+            color: var(--text-main);
+            position: sticky;
+            left: 0;
+            z-index: 2;
+        }
+
+        .cell {
+            background-color: var(--cell-bg);
+            padding: 20px 15px;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            align-items: center;
+            position: relative;
+        }
+
+        /* --- ELEMENTOS BPMN --- */
+        .bpmn-element {
+            padding: 12px 10px;
+            font-size: 0.85rem;
+            line-height: 1.3;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+            position: relative;
+            transition: all 0.2s ease-in-out;
+            width: 90%;
+        }
+
+        .clickable:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.15);
+            cursor: pointer;
+            filter: brightness(0.95);
+        }
+
+        .bpmn-element i.main-icon {
+            display: block;
+            font-size: 1.3rem;
+            margin-bottom: 8px;
+        }
+
+        .gateway i.main-icon {
+            display: inline-block;
+            margin-bottom: 0;
+            margin-right: 6px;
+        }
+
+        .task {
+            background-color: var(--task-bg);
+            border: 1px solid var(--task-border);
+            border-left: 4px solid var(--task-border);
+            border-radius: 6px;
+            text-align: center;
+            color: var(--task-text);
+            font-weight: 500;
+        }
+        .task i.main-icon { color: var(--task-border); }
+
+        .task-sub {
+            background-color: var(--task-bg);
+            border: 2px dashed var(--task-border);
+            border-radius: 6px;
+            text-align: center;
+            color: var(--task-text);
+            font-weight: 500;
+        }
+        .task-sub i.main-icon { color: var(--task-border); }
+        .task-sub::after {
+            content: "[+]";
+            display: block;
+            margin-top: 8px;
+            font-weight: bold;
+            color: var(--task-border);
+        }
+
+        .gateway {
+            background-color: var(--gateway-bg);
+            border: 1px solid var(--gateway-border);
+            border-left: 4px solid var(--gateway-border);
+            text-align: center;
+            clip-path: polygon(50% 0%, 100% 50%, 50% 100%, 0% 50%);
+            padding: 25px 5px;
+            font-weight: bold;
+            color: var(--gateway-text);
+            width: 70px;
+            height: 70px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto;
+        }
+        .gateway i.main-icon { color: var(--gateway-border); font-size: 1.5rem; }
+
+        .event-start {
+            background-color: var(--event-start-bg);
+            border: 2px solid var(--event-start-border);
+            border-radius: 50%;
+            width: 45px;
+            height: 45px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto;
+            color: var(--event-start-text);
+        }
+
+        .event-end {
+            background-color: var(--event-end-bg);
+            border: 2px solid var(--event-end-border);
+            border-radius: 50%;
+            width: 45px;
+            height: 45px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto;
+            color: var(--event-end-text);
+        }
+
+        .artifact {
+            background-color: transparent;
+            border: 1px dashed var(--artifact-border);
+            padding: 8px;
+            color: var(--text-muted);
+            font-style: italic;
+            box-shadow: none;
+            width: 85%;
+        }
+        .artifact i { margin-right: 5px; color: var(--text-muted); }
+
+        .flow-arrow {
+            text-align: center;
+            color: var(--border-color);
+            font-size: 1.2rem;
+            margin: -5px 0;
+        }
+
+        /* --- ÍCONOS DE DIRECCIÓN --- */
+        .dir-icon {
+            position: absolute;
+            top: -10px;
+            right: -10px;
+            background-color: var(--cell-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 50%;
+            padding: 5px;
+            font-size: 0.8rem;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.15);
+            z-index: 5;
+        }
+        .dir-icon.dtd {
+            color: #8b5cf6; 
+        }
+        .dir-icon.di {
+            color: #10b981; 
+        }
+
+
+        /* --- ESTILOS DE LA VENTANA MODAL --- */
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background-color: var(--modal-overlay);
+            backdrop-filter: blur(3px);
+            z-index: 1000;
+            justify-content: center;
+            align-items: center;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+
+        .modal-overlay.active {
+            display: flex;
+            opacity: 1;
+        }
+
+        .modal-content {
+            background-color: var(--cell-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 30px;
+            width: 90%;
+            max-width: 500px;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+            position: relative;
+            transform: translateY(-20px);
+            transition: transform 0.3s ease;
+        }
+
+        .modal-overlay.active .modal-content {
+            transform: translateY(0);
+        }
+
+        .modal-close {
+            position: absolute;
+            top: 15px;
+            right: 20px;
+            font-size: 1.5rem;
+            color: var(--text-muted);
+            cursor: pointer;
+            border: none;
+            background: none;
+            transition: color 0.2s;
+        }
+
+        .modal-close:hover {
+            color: var(--event-end-border);
+        }
+
+        .modal-title {
+            font-size: 1.25rem;
+            font-weight: 600;
+            color: var(--text-main);
+            margin-top: 0;
+            margin-bottom: 15px;
+            border-bottom: 2px solid var(--border-color);
+            padding-bottom: 10px;
+        }
+
+        .modal-body {
+            font-size: 0.95rem;
+            color: var(--text-muted);
+            line-height: 1.6;
+        }
+
+        @media (max-width: 1200px) {
+            .bpmn-pool { font-size: 0.9rem; }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- BOTÓN FLOTANTE (FAB) PARA TEMA -->
+    <button id="themeToggle" class="theme-btn" title="Cambiar Tema"><i class="fa-solid fa-moon"></i></button>
+
+    <h1>Fases de Desarrollo de Aplicaciones y Pase a Producción</h1>
+    <p class="subtitle">Este es el resultado del levantamineto de las entrevistas a las distintas gerencias de Transformación Digital e Infraestructura. </p>
+
+    <!-- Controles agregados: Leyenda -->
+    <div class="controls-container">
+        <div class="legend">
+            <span><i class="fa-solid fa-code" style="color:#8b5cf6;"></i> Transformación Digital (Desarrollo)</span>
+            <span><i class="fa-solid fa-network-wired" style="color:#10b981;"></i> Infraestructura y TI</span>
+        </div>
+    </div>
+
+    <div class="bpmn-pool">
+        <!-- Fila de Encabezados de Fases -->
+        <div class="header-cell" style="grid-column: 1 / 2; background: transparent;"></div>
+        <div class="header-cell">Fase 1: Inicio y Planeación</div>
+        <div class="header-cell">Fase 2: Diseño</div>
+        <div class="header-cell">Fase 3: Desarrollo</div>
+        <div class="header-cell">Fase 4: Pruebas (UAT)</div>
+        <div class="header-cell">Fase 5: Despliegue</div>
+        <div class="header-cell">Fase 6: Mantenimiento</div>
+
+        <!-- Lane 1: Líder Usuario -->
+        <div class="lane-title">Líder Usuario</div>
+        <div class="cell">
+            <div class="event-start clickable" data-title="Inicio de Proceso" data-desc="Solicitud de servicio iniciada por el Líder Usuario. En este paso se genera el documento de entrada inicial: Solicitud de servicios de IT (MPFB01-03)."><i class="fa-solid fa-play"></i></div>
+            <div class="flow-arrow">↓</div>
+            <div class="bpmn-element artifact"><i class="fa-solid fa-file-signature"></i> Solicitud de Servicio (MPFB01-03)</div>
+        </div>
+        <div class="cell"></div>
+        <div class="cell"></div>
+        <div class="cell"></div>
+        <div class="cell">
+            <div class="bpmn-element task clickable" data-title="Validar Aceptación del Usuario" data-desc="El Líder Usuario realiza la aceptación formal del sistema tras finalizar el periodo de uso de 2 semanas durante la fase de despliegue a productivo">
+                <i class="fa-solid fa-code dir-icon dtd" title="Transformación Digital"></i>
+                <i class="fa-solid fa-user-check main-icon"></i> Validar Aceptación del Usuario
+            </div>
+        </div>
+        <div class="cell"></div>
+
+        <!-- Lane 2: Gerente TI -->
+        <div class="lane-title">Gerente TI</div>
+        <div class="cell">
+            <div class="bpmn-element task clickable" data-title="Aprobar Autorización de proyecto y SLAs" data-desc="El Gerente aprueba formalmente la Elaboración de Autorización de Proyecto, documento que incluye la definición de los SLA's e involucra el formato PMO-INI-10">
+                <i class="fa-solid fa-code dir-icon dtd" title="Transformación Digital"></i>
+                <i class="fa-solid fa-file-contract main-icon"></i> Aprobar Autorización de proyecto y SLAs (PMO-INI-10)
+            </div>
+        </div>
+        <div class="cell"></div>
+        <div class="cell"></div>
+        <div class="cell"></div>
+        <div class="cell"></div>
+        <div class="cell"></div>
+
+        <!-- Lane 3: Líder de Proyecto TI -->
+        <div class="lane-title">Líder de Proyecto TI</div
+        <div class="cell">
+            <div class="bpmn-element task clickable" data-title="Analizar y evaluar requerimientos" data-desc="Fase de ANTEPROYECTO. El Líder de Proyecto TI, en conjunto con el Líder Usuario, realiza el análisis y evaluación de los requerimientos iniciales.">
+                <i class="fa-solid fa-code dir-icon dtd" title="Transformación Digital"></i>
+                <i class="fa-solid fa-magnifying-glass-chart main-icon"></i> Analizar y evaluar requerimientos
+            </div>
+            <div class="flow-arrow">↓</div>
+            <div class="bpmn-element gateway clickable" data-title="¿Es Viable?" data-desc="Compuerta de decisión. Si el proyecto NO es viable, se envía notificación de rechazo al área usuaria y finaliza el proceso. Si SÍ es viable, avanza."><i class="fa-solid fa-code-branch main-icon"></i></div>
+            <div class="flow-arrow">↓ (No)</div>
+            <div class="event-end clickable" data-title="Fin del Proceso (Rechazo)" data-desc="El proyecto ha sido evaluado como no viable y se notifica el rechazo al área usuaria."><i class="fa-solid fa-ban"></i></div>
+        </div>
+        <div class="cell">
+            <div class="bpmn-element task-sub clickable" data-title="Subproceso: Planificación y Diseño Arquitectónico" data-desc="Esta etapa comprende: Definición de requerimientos, stack tecnológico, arquitectura, plan de trabajo, control de cambios y Hoja Roja. También incluye solicitar infraestructura (servidores DEV, BD), elaborar planes de contingencia y ejecutar Check Marks de Ciberseguridad.">
+                <i class="fa-solid fa-code dir-icon dtd" title="Transformación Digital"></i>
+                <i class="fa-solid fa-sitemap main-icon"></i> Planificación y Diseño Arquitectónico
+            </div>
+            <div class="bpmn-element artifact"><i class="fa-solid fa-file-shield"></i> DRP & Plan Roll Back</div>
+        </div>
+        <div class="cell">
+            <div class="bpmn-element task clickable" data-title="Gestionar control de cambios" data-desc="Fase de CODIFICACIÓN. Desarrollo de código y gestión de cambios bajo la normativa PMO-EJE-04.">
+                <i class="fa-solid fa-code dir-icon dtd" title="Transformación Digital"></i>
+                <i class="fa-solid fa-code-pull-request main-icon"></i> Gestionar control de cambios (PMO-EJE-04)
+            </div>
+        </div>
+        <div class="cell">
+            <div class="bpmn-element task clickable" data-title="Coordinar Pruebas y Manuales" data-desc="Se ejecutan pruebas UAT. Se elaboran requerimientos paso a productivo: Plan Roll Back, Plan de Instalación/despliegue, DRP (si aplica), elaboración de Manual Técnico y aplicativo de atención a fallas.">
+                <i class="fa-solid fa-code dir-icon dtd" title="Transformación Digital"></i>
+                <i class="fa-solid fa-list-check main-icon"></i> Coordinar Pruebas y Manuales
+            </div>
+            <div class="bpmn-element artifact"><i class="fa-solid fa-file-import"></i> Plan de Despliegue</div>
+        </div>
+        <div class="cell">
+            <div class="bpmn-element task clickable" data-title="Notificar Hoja Roja" data-desc="Elaborar control de cambios y notificar el Formato Hoja de atención a Fallas (Hoja Roja).">
+                <i class="fa-solid fa-code dir-icon dtd" title="Transformación Digital"></i>
+                <i class="fa-solid fa-file-circle-exclamation main-icon"></i> Notificar Hoja Roja
+            </div>
+            <div class="flow-arrow">↓</div>
+            <div class="bpmn-element gateway clickable" data-title="¿Despliegue Exitoso?" data-desc="Verificación post-instalación para determinar si el paso a productivo y la integración fueron exitosos. Si falla, se ejecuta el Roll Back."><i class="fa-solid fa-check-double main-icon"></i></div>
+            <div class="flow-arrow">↓ (Sí)</div>
+            <div class="bpmn-element task clickable" data-title="Cierre de Proyecto" data-desc="Fase de estabilización y cierre. Involucra un periodo de uso de 2 semanas, validación de KPI's operacionales y cierre formal.">
+                <i class="fa-solid fa-code dir-icon dtd" title="Transformación Digital"></i>
+                <i class="fa-solid fa-box-archive main-icon"></i> Cierre de Proyecto
+            </div>
+        </div>
+        <div class="cell"></div>
+
+        <!-- Lane 4: Líder Digital -->
+        <div class="lane-title">Líder Digital</div>
+        <div class="cell"></div>
+        <div class="cell">
+            <div class="bpmn-element task clickable" data-title="Definir Stack y Arquitectura" data-desc="Corresponsabilidad en la Fase de Diseño: Definición y aprobación de la Arquitectura y definición de infraestructura completa para el desarrollo de la aplicación.">
+                <i class="fa-solid fa-code dir-icon dtd" title="Transformación Digital"></i>
+                <i class="fa-solid fa-layer-group main-icon"></i> Definir Stack y Arquitectura
+            </div>
+            <div class="bpmn-element task clickable" data-title="Solicitar Infra y Check Marks" data-desc="Solicitud de Bases de Datos en todos los ambientes, servidores DEV, requerimientos de redes, asignación de IPs asociadas a Hostnames. Responsabilidad de proveer recae en Infraestructura.">
+                <i class="fa-solid fa-network-wired dir-icon di" title="Infraestructura y TI"></i>
+                <i class="fa-solid fa-server main-icon"></i> Solicitar Infra y Check Marks
+            </div>
+        </div>
+        <div class="cell">
+            <div class="bpmn-element task clickable" data-title="Desarrollar código base" data-desc="Codificación pura y dura. Desarrollo de código base de la solución bajo lineamientos establecidos en la fase de arquitectura.">
+                <i class="fa-solid fa-code dir-icon dtd" title="Transformación Digital"></i>
+                <i class="fa-solid fa-laptop-code main-icon"></i> Desarrollar código base
+            </div>
+        </div>
+        <div class="cell">
+            <div class="bpmn-element task-sub clickable" data-title="Ejecutar Pruebas (UAT)" data-desc="Realizar pruebas UAT: Unitarias, Funcionales e Integrales. Se apoyan en una Matriz de Pruebas de proyecto y una Matriz de escalación.">
+                <i class="fa-solid fa-code dir-icon dtd" title="Transformación Digital"></i>
+                <i class="fa-solid fa-vial-circle-check main-icon"></i> Ejecutar Pruebas (Unit, Func, Integ)
+            </div>
+            <div class="bpmn-element task clickable" data-title="Validar componentes PRO" data-desc="Validación y confirmación de todos los componentes de infraestructura en el entorno Productivo (PRO) y verificación de los Check Marks de ciberseguridad finales. Competencia de Infra.">
+                <i class="fa-solid fa-network-wired dir-icon di" title="Infraestructura y TI"></i>
+                <i class="fa-solid fa-shield-halved main-icon"></i> Validar componentes PRO y Ciberseguridad
+            </div>
+        </div>
+        <div class="cell">
+            <div class="bpmn-element task-sub clickable" data-title="Ejecutar plan de integración" data-desc="Paso a Productivo: Ejecutar el plan de integración, instalación física en servidores y despliegue del aplicativo apoyado por TI/Infraestructura.">
+                <i class="fa-solid fa-network-wired dir-icon di" title="Infraestructura y TI"></i>
+                <i class="fa-solid fa-gears main-icon"></i> Ejecutar plan de integración
+            </div>
+            <div class="bpmn-element artifact"><i class="fa-solid fa-file-prescription"></i> Hoja Roja</div>
+        </div>
+        <div class="cell"></div>
+
+        <!-- Lane 5: Gerente Sistemas / Mesa de Servicio -->
+        <div class="lane-title">Sistemas / Mesa Servicio</div>
+        <div class="cell"></div>
+        <div class="cell"></div>
+        <div class="cell"></div>
+        <div class="cell"></div>
+        <div class="cell"></div>
+        <div class="cell">
+            <div class="bpmn-element task clickable" data-title="Mantenimiento programado y revisiones" data-desc="Fase de Mantenimiento operada por el área de Sistemas. Asegura el uso y la mejora del producto, ejecutando planes de mantenimiento, revisiones programadas y limpieza de BD.">
+                <i class="fa-solid fa-network-wired dir-icon di" title="Infraestructura y TI"></i>
+                <i class="fa-solid fa-screwdriver-wrench main-icon"></i> Mantenimiento programado y revisiones
+            </div>
+            <div class="flow-arrow">↓</div>
+            <div class="bpmn-element task clickable" data-title="Soporte y atención a fallas" data-desc="Fase de Soporte. La Mesa de Servicio atiende incidentes escalando a diferentes niveles (N1, N2, N3) según la severidad del fallo.">
+                <i class="fa-solid fa-network-wired dir-icon di" title="Infraestructura y TI"></i>
+                <i class="fa-solid fa-headset main-icon"></i> Soporte atención a fallas
+            </div>
+            <div class="flow-arrow">↓</div>
+            <div class="bpmn-element task clickable" data-title="Ejecutar DRP (Condicional)" data-desc="En caso de que ocurra un desastre grave o pérdida de servicios en infraestructura, se activa y ejecuta el DRP (Disaster Recovery Plan).">
+                <i class="fa-solid fa-network-wired dir-icon di" title="Infraestructura y TI"></i>
+                <i class="fa-solid fa-truck-medical main-icon"></i> Condicional: Ejecutar DRP
+            </div>
+            <div class="flow-arrow">↓</div>
+            <div class="event-end clickable" data-title="Fin del Ciclo de Vida" data-desc="Fin del flujo. El ciclo de vida operativo del proyecto se estabiliza en este punto hasta su retiro o reingeniería."><i class="fa-solid fa-power-off"></i></div>
+        </div>
+    </div>
+
+    <!-- MODAL HTML -->
+    <div class="modal-overlay" id="infoModal">
+        <div class="modal-content">
+            <button class="modal-close" id="closeModal">&times;</button>
+            <h2 class="modal-title" id="modalTitle">Título de la Actividad</h2>
+            <div class="modal-body" id="modalDesc">
+                Descripción detallada de la actividad...
+            </div>
+        </div>
+    </div>
+
+    <!-- JAVASCRIPT -->
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            // Lógica del Cambio de Tema (Light / Dark)
+            const themeBtn = document.getElementById('themeToggle');
+            const htmlElement = document.documentElement;
+
+            themeBtn.addEventListener('click', () => {
+                const currentTheme = htmlElement.getAttribute('data-theme');
+                if (currentTheme === 'light') {
+                    htmlElement.setAttribute('data-theme', 'dark');
+                    themeBtn.innerHTML = '<i class="fa-solid fa-sun"></i>';
+                    themeBtn.style.backgroundColor = '#f59e0b'; // Amarillo para el sol
+                } else {
+                    htmlElement.setAttribute('data-theme', 'light');
+                    themeBtn.innerHTML = '<i class="fa-solid fa-moon"></i>';
+                    themeBtn.style.backgroundColor = '#3b82f6'; // Azul para la luna
+                }
+            });
+
+            // Lógica de la Modal
+            const modal = document.getElementById('infoModal');
+            const btnClose = document.getElementById('closeModal');
+            const titleEl = document.getElementById('modalTitle');
+            const descEl = document.getElementById('modalDesc');
+            const clickables = document.querySelectorAll('.clickable');
+
+            clickables.forEach(el => {
+                el.addEventListener('click', () => {
+                    const title = el.getAttribute('data-title');
+                    const desc = el.getAttribute('data-desc');
+                    titleEl.textContent = title;
+                    descEl.innerHTML = desc; 
+                    modal.classList.add('active');
+                });
+            });
+
+            btnClose.addEventListener('click', () => {
+                modal.classList.remove('active');
+            });
+
+            modal.addEventListener('click', (e) => {
+                if (e.target === modal) {
+                    modal.classList.remove('active');
+                }
+            });
+        });
+    </script>
+</body>
+</html>
